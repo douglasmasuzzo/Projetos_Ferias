@@ -1,2 +1,2 @@
 # Projetos_Ferias
-Pequenos desenvolvimentos de projetos
+Leve desenvolvimento de projetos gráficos realizados por CSS
