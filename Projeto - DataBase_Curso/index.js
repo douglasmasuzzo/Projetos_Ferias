@@ -13,7 +13,7 @@ app.use('/cursos', cursoRoutes );
 
 // servidor
 app.listen( 3000, () => {
-    console.log('Servidor executado em http://localhost:3000');
+    console.log('Servidor executado em http://localhost:3000/cursos');
 });
 
 // NODE.JS SERVIDOR = http://localhost:3000

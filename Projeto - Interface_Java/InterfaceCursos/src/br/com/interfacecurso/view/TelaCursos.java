@@ -42,6 +42,7 @@ public class TelaCursos extends JFrame {
 
         try {
             String json = CursoService.buscarCursos();
+            System.out.println("RESPOSTA DA API : " + json );
             tableModel.setRowCount( 0 );
 
             json = json
