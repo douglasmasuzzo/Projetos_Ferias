@@ -7,7 +7,7 @@ import java.net.http.HttpResponse;
 
 public class CursoService {
     
-    private static final String URL = "https://localhost:3030/cursos";
+    private static final String URL = "http://localhost:3000/cursos";
 
     public static String buscarCursos() throws Exception{
         HttpClient client = HttpClient.newHttpClient();
