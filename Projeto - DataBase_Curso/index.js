@@ -15,3 +15,7 @@ app.use('/cursos', cursoRoutes );
 app.listen( 3000, () => {
     console.log('Servidor executado em http://localhost:3000');
 });
+
+// NODE.JS SERVIDOR = http://localhost:3000
+// MYSQL SERVIDOR = localhost:3306
+// POSTMAN = GET http://localhost:3000/cursos 
