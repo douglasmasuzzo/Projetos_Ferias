@@ -1,7 +1,6 @@
-package br.com.interfacecurso.service;
-import br.com.interfacecurso.model.Curso;
+package br.com.interfacecurso.service; import br.com.interfacecurso.model.Curso;
 
-import java.util.List; import java.util.ArrayList;
+import java.util.ArrayList; import java.util.List;
 import java.net.URI; import java.net.http.HttpClient;
 import java.net.http.HttpRequest; import java.net.http.HttpResponse;
 
@@ -9,7 +8,7 @@ public class CursoService {
 
     private static final String URL = "http://localhost:3000/cursos";
 
-    public List<Curso> listarCursos() throws Exception {
+    public List< Curso > listarCursos() throws Exception {
 
         HttpClient client = HttpClient.newHttpClient();
         HttpRequest request = HttpRequest
@@ -24,34 +23,35 @@ public class CursoService {
             throw new RuntimeException("ERRO HTTP: " + response.statusCode());
         }
 
-        return converterJson(response.body());
+        return parseJson(response.body());
     }
-    
-     private List<Curso> converterJson(String json) {
+
+    private List<Curso> parseJson(String json) {
 
         List<Curso> cursos = new ArrayList<>();
 
-         json = json.replace("\n", "")
+        json = json.replace("\n", "")
                    .replace("\r", "")
                    .replace("[", "")
                    .replace("]", "")
                    .trim();
-                   
-        String[] objetos = json.split("\\},\\{");
 
-        for (String obj : objetos) {
+        if (json.isEmpty()) return cursos;
+
+        String[] objetos = json.split("\\},\\s*\\{");
+
+        for ( String obj : objetos ) {
 
             obj = obj.replace("{", "").replace("}", "");
             String[] campos = obj.split(",");
 
-            int codigo = 0;
-            String curso = "";
-            String periodo = "";
-            int ano = 0;
+            int codigo = 0; String curso = ""; String periodo = ""; int ano = 0;
 
             for (String campo : campos) {
-
                 String[] par = campo.split(":");
+                
+                if (par.length < 2) continue;
+
                 String chave = par[0].replace("\"", "").trim();
                 String valor = par[1].replace("\"", "").trim();
 
@@ -70,9 +70,8 @@ public class CursoService {
                 }
             }
 
-            cursos.add(new Curso(codigo, curso, periodo, ano));
+            cursos.add( new Curso( codigo, curso, periodo, ano ));
         }
-
         return cursos;
     }
 }
