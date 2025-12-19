@@ -1,33 +1,78 @@
 package br.com.interfacecurso.service;
-
 import br.com.interfacecurso.model.Curso;
-import com.google.gson.Gson; import com.google.gson.reflect.TypeToken;
 
-import java.lang.reflect.Type; import java.net.URI;
-import java.net.http.HttpClient; import java.net.http.HttpRequest;
-import java.net.http.HttpResponse; import java.util.List;
+import java.util.List; import java.util.ArrayList;
+import java.net.URI; import java.net.http.HttpClient;
+import java.net.http.HttpRequest; import java.net.http.HttpResponse;
 
-public class CursoService{
+public class CursoService {
 
     private static final String URL = "http://localhost:3000/cursos";
-    private static final Gson gson = new Gson();
 
-    public static List< Curso > listarCursos() throws Exception {
+    public List<Curso> listarCursos() throws Exception {
 
         HttpClient client = HttpClient.newHttpClient();
-        HttpRequest request = HttpRequest.
-            newBuilder( URI.create( URL ) ).GET().build()
-        ;
+        HttpRequest request = HttpRequest
+                .newBuilder(URI.create(URL))
+                .GET()
+                .build();
 
-        HttpResponse< String > response =
-            client.send( request, HttpResponse.BodyHandlers.ofString() );
+        HttpResponse<String> response =
+                client.send(request, HttpResponse.BodyHandlers.ofString());
 
-        if ( response.statusCode() != 200 ){
-            throw new RuntimeException( "ERRO HTTP : " + response.statusCode() );
+        if (response.statusCode() != 200) {
+            throw new RuntimeException("ERRO HTTP: " + response.statusCode());
         }
 
-        Type listType = new TypeToken< List< Curso >>(){}.getType();
-        return gson.fromJson( response.body() , listType );
+        return converterJson(response.body());
+    }
+    
+     private List<Curso> converterJson(String json) {
+
+        List<Curso> cursos = new ArrayList<>();
+
+         json = json.replace("\n", "")
+                   .replace("\r", "")
+                   .replace("[", "")
+                   .replace("]", "")
+                   .trim();
+                   
+        String[] objetos = json.split("\\},\\{");
+
+        for (String obj : objetos) {
+
+            obj = obj.replace("{", "").replace("}", "");
+            String[] campos = obj.split(",");
+
+            int codigo = 0;
+            String curso = "";
+            String periodo = "";
+            int ano = 0;
+
+            for (String campo : campos) {
+
+                String[] par = campo.split(":");
+                String chave = par[0].replace("\"", "").trim();
+                String valor = par[1].replace("\"", "").trim();
+
+                switch (chave) {
+                    case "codigo":
+                        codigo = Integer.parseInt(valor); break;
+
+                    case "curso":
+                        curso = valor; break;
+
+                    case "periodo":
+                        periodo = valor; break;
+
+                    case "ano":
+                        ano = Integer.parseInt(valor); break;
+                }
+            }
+
+            cursos.add(new Curso(codigo, curso, periodo, ano));
+        }
+
+        return cursos;
     }
 }
-
