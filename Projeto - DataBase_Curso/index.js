@@ -11,6 +11,10 @@ app.use( cors() ); app.use( express.json() );
 // rotas 
 app.use('/cursos', cursoRoutes );
 
+app.use( ( req, res, next ) => {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8'); next();
+}); 
+
 // servidor
 app.listen( 3000, () => {
     console.log('Servidor executado em http://localhost:3000/cursos');
