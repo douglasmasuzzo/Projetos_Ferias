@@ -7,9 +7,14 @@ def status_bateria():
     if not bateria: 
         return None
     
+    tempo = bateria.secsleft
+
+    if tempo < -2 :
+        tempo = -1
+
     return {
-        "timestamp": datetime.now().srtftime(),
-        "percentual": bateria.percent,
-        "carregando": bateria.power_plugged,
-        "tempo_restante": bateria.secsleft
+        "timestamp": datetime.now(),
+        "percent": bateria.percent,
+        "plugged": bateria.power_plugged,
+        "running_time": bateria.secsleft
     }
