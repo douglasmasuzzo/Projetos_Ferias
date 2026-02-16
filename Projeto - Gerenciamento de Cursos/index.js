@@ -2,22 +2,49 @@
 
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+require('dotenv').config();
+
 const cursoRoutes = require('./routes/cursoRoutes');
 const app = express();
 
-// middleware
-app.use( cors() ); app.use( express.json() );
+// configuração - porta
+const PORT = process.env.PORT || 3000;
 
-// rotas 
+// middlewares globais - segurança de headers HTTP
+app.use( helmet() );
+
+// liberação  de requisições
+app.use( cors() );
+
+// parsing de json com limitação de tamanho
+app.use( express.json({ limit: '1mb' }) );
+app.use( express.urlencoded({ extended: true, limit: '1mb' }));
+
+// rotas
 app.use('/cursos', cursoRoutes );
 
-app.use( ( req, res, next ) => {
-  res.setHeader('Content-Type', 'application/json; charset=utf-8'); next();
-}); 
+// rota 404
+app.use( ( req, res ) => {
+  res.status( 404 ).json({
+    status : 404,
+    erro: 'ROTA NÃO ENCONTRADA'
+  });
+});
 
-// servidor
-app.listen( 3000, () => {
-    console.log('Servidor executado em http://localhost:3000/cursos');
+// error handler
+app.use( ( err, req, res, next ) => {
+  console.error( 'ERROR: ', err.stack );
+
+  res.status( err.status || 500 ).json({
+    status : err.status || 500,
+    erro: process.env.NODE_ENV === 'production' ? 'ERRO INTERNO DO SERVIDOR' : err.message
+  });
+});
+
+// inicialização - servidor
+app.listen( PORT, () => {
+  console.log(`SERVIDOR EXECUTANDO EM http://localhost:${ PORT }`);
 });
 
 // NODE.JS SERVIDOR = http://localhost:3000
