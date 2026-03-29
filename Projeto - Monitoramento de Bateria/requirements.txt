@@ -1,3 +1,4 @@
 psutil
+supabase
 pymysql
 python-dotenv
