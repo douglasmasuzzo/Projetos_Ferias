@@ -66,7 +66,7 @@ class AppBateria:
 
         self.label.config( 
             text = (
-                f"Carga: { relatorio.percent:.1f}%\n "
+                f"Carga: { relatorio.percent:.1f}%\n"
                 f"Status: {'Carregando 🔋' if relatorio.plugged else 'Em uso 🪫'}\n"
                 f"{ status }"
             )
