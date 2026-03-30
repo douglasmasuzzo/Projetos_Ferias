@@ -74,7 +74,7 @@ class AppBateria:
 
         resultado = salvar_registro( relatorio )
 
-        supabase_info = "✅ SINCRONIZAÇÃO COM SUBASE" if resultado["supabase"] else "❌ ERRO DE SINCRONIZAÇÃO"
+        supabase_info = "✅ SINCRONIZAÇÃO COM SUPABASE" if resultado["supabase"] else "❌ ERRO DE SINCRONIZAÇÃO"
         mysql_info = "✅ SINCRONIZAÇÃO COM MYSQL" if resultado["mysql"] else "❌ ERRO DE SINCRONIZAÇÃO"
         cor = "green" if resultado["supabase"] and resultado["mysql"] else "dark blue"
 
