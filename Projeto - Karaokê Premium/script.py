@@ -8,20 +8,27 @@ import json
 import shutil
 from dotenv import load_dotenv
 
+try:
+    import msvcrt
+except ImportError:
+    msvcrt = None
+
 load_dotenv()
 
-# Caminho para o executável
 MPV_PATH = os.getenv("MPV_PATH", r"C:\Users\masuz\AppData\Local\Programs\mpv.net\mpvnet.exe").strip('"').strip("'")
 
 # Variáveis globais
 tempo_atual = 0.0
 duracao_total = 0.0
 player_ativo = True
+offset_ajuste = 0.0 
 
 def formatar_tempo_lrc(lrc_timestamp):
-    match = re.search(r'\[(\d+):(\d+\.\d+)\]', lrc_timestamp)
+    match = re.search(r'\[(\d+):(\d+(?:[\.\:]\d+)?)\]', lrc_timestamp)
     if match:
-        return int(match.group(1)) * 60 + float(match.group(2))
+        minutos = int(match.group(1))
+        segundos_str = match.group(2).replace(':', '.')
+        return minutos * 60 + float(segundos_str)
     return None
 
 def formatar_segundos(segundos):
@@ -32,12 +39,16 @@ def formatar_segundos(segundos):
 def limpar_console():
     os.system('cls' if os.name == 'nt' else 'clear')
 
+def limpar_lrc(conteudo):
+    if not conteudo: return ""
+    texto = re.sub(r'\[.*?\]', '', conteudo)
+    linhas = [linha.strip() for linha in texto.split('\n') if linha.strip()]
+    return "\n".join(linhas)
+
 def monitorar_via_ipc():
-    """Comunicação direta com o motor do MPV via Named Pipe."""
     global tempo_atual, duracao_total, player_ativo
     pipe_path = r'\\.\pipe\mpv-karaoke'
     
-    # Aguarda o Pipe ser criado pelo MPV
     for _ in range(30): 
         if os.path.exists(pipe_path): break
         time.sleep(0.5)
@@ -45,7 +56,6 @@ def monitorar_via_ipc():
     while player_ativo:
         try:
             with open(pipe_path, 'w+b') as pipe:
-                # Pergunta tempo atual e duração total
                 for prop in ["time-pos", "duration"]:
                     msg = f'{{"command": ["get_property", "{prop}"]}}\n'
                     pipe.write(msg.encode('utf-8'))
@@ -59,125 +69,127 @@ def monitorar_via_ipc():
         except: pass
         time.sleep(0.1)
 
-def exibir_layout(musica, artista, letra_atual, proxima_letra):
-    limpar_console()
+def exibir_barra_status(atual, total, offset, modo_estatico=False):
     colunas = shutil.get_terminal_size().columns
-    
-    # Cabeçalho
-    print("\033[1;36m" + "╔" + "═"*(colunas-2) + "╗\033[0m")
-    titulo = f" 🎤 KARAOKÊ PREMIUM: {musica.upper()} - {artista.upper()} "
-    print("\033[1;36m║" + titulo.center(colunas-2) + "║\033[0m")
-    print("\033[1;36m" + "╠" + "═"*(colunas-2) + "╣\033[0m")
-
-    # Espaçamento Central
-    print("\n" * 3)
-    
-    # Letra Principal (Verde Brilhante)
-    print("\033[1;32m" + letra_atual.center(colunas) + "\033[0m")
-    
-    # Próxima Letra (Cinza)
-    print("\n\033[90m" + f"({proxima_letra})".center(colunas) + "\033[0m")
-    
-    print("\n" * 3)
-
-    # Barra de Progresso
-    if duracao_total > 0:
-        percent = tempo_atual / duracao_total
-        largura_barra = colunas - 20
+    if total > 0:
+        percent = min(atual / total, 1.0)
+        largura_barra = colunas - 45
         preenchido = int(largura_barra * percent)
         barra = "█" * preenchido + "░" * (largura_barra - preenchido)
-        tempo_str = f"{formatar_segundos(tempo_atual)} / {formatar_segundos(duracao_total)}"
-        print(f"   {tempo_str}  \033[1;34m{barra}\033[0m".center(colunas))
+        tempo_str = f"{formatar_segundos(atual)} / {formatar_segundos(total)}"
+        ajuste_str = f" [Sinc: {offset:+.1f}s]" if not modo_estatico else ""
+        print(f"\r\033[K   {tempo_str}  \033[1;34m{barra}\033[0m{ajuste_str}", end="", flush=True)
 
-    # Rodapé de Instruções
-    print("\n\033[1;36m" + "╚" + "═"*(colunas-2) + "╝\033[0m")
-    print("\033[90mControles no Player: [Espaço] Pause | [Setas] Pular trechos\033[0m".center(colunas))
+def exibir_cabecalho(musica, artista, modo_estatico=False):
+    limpar_console()
+    colunas = shutil.get_terminal_size().columns
+    cor = "\033[1;33m" if modo_estatico else "\033[1;36m"
+    status = " (MODO ESTÁTICO)" if modo_estatico else ""
+    print(f"{cor}╔" + "═"*(colunas-2) + f"╗\033[0m")
+    titulo = f" 🎤 KARAOKÊ PREMIUM{status}: {musica.upper()} - {artista.upper()} "
+    print(f"{cor}║" + titulo.center(colunas-2) + f"║\033[0m")
+    print(f"{cor}╠" + "═"*(colunas-2) + f"╣\033[0m")
+
+def buscar_letra_inteligente(artista, musica):
+    termos = [
+        f"{artista} {musica}",
+        f"{musica} {artista}",
+        f"{artista} {musica} official"
+    ]
+    
+    for termo in termos:
+        print(f"\033[90m🔎 Buscando por: '{termo}'...\033[0m")
+        try:
+            # Tenta múltiplos provedores para garantir qualidade
+            lrc = syncedlyrics.search(termo)
+            if lrc and "[" in lrc and len(lrc) > 100:
+                # Preview da letra para o usuário
+                linhas_limpas = limpar_lrc(lrc).split('\n')[:3]
+                print(f"\n\033[1;32m✅ Letra encontrada!\033[0m")
+                print(f"\033[90mPreview:\033[0m\n   > " + "\n   > ".join(linhas_limpas))
+                confirmar = input("\n❔ Esta letra está correta? (S/n): ").lower()
+                if confirmar != 'n':
+                    return lrc
+        except: continue
+    return None
 
 def tocar_karaoke():
+    global player_ativo, tempo_atual, duracao_total, offset_ajuste
     limpar_console()
     print("\033[1;35m" + " INITIALIZING KARAOKE ENGINE... ".center(50, "=") + "\033[0m")
     
     artista = input("\n👤 Nome do Artista: ")
     musica = input("🎵 Nome da Música: ")
     
-    # Dica: Adicionar 'Official Audio' ajuda a sincronizar com letras de CD
-    busca_audio = f"{musica} {artista} official audio"
-    busca_letra = f"{musica} {artista}"
+    # Busca por áudio oficial para evitar versões com introduções longas
+    busca_audio = f"{artista} {musica} official audio"
 
-    # OFFSET: Se a música estiver adiantada/atrasada, mude este valor (em segundos)
-    # Ex: 2.0 (atrasa a letra em 2s) | -2.0 (adianta a letra em 2s)
-    offset_ajuste = 0.0 
+    lrc_content = buscar_letra_inteligente(artista, musica)
 
-    print(f"\n\033[90m🔎 Buscando letra sincronizada em nuvem...\033[0m")
-    try:
-        lrc_content = syncedlyrics.search(busca_letra)
-    except:
-        print("❌ Erro ao conectar ao servidor de letras.")
-        return
-
-    if not lrc_content:
-        print("❌ Letra não encontrada.")
-        return
-
-    # Parsing das letras
     letras = []
-    for linha in lrc_content.split('\n'):
-        t = formatar_tempo_lrc(linha)
-        if t is not None:
-            txt = linha.split("]")[-1].strip()
-            if txt: letras.append({"tempo": t + offset_ajuste, "texto": txt})
+    if lrc_content:
+        for linha in lrc_content.split('\n'):
+            t = formatar_tempo_lrc(linha)
+            if t is not None:
+                txt = linha.split("]")[-1].strip()
+                if txt: letras.append({"tempo": t, "texto": txt})
 
-    if not letras:
-        print("❌ Letra encontrada, mas não é sincronizada.")
-        return
+    modo_estatico = len(letras) == 0
+    texto_estatico = limpar_lrc(lrc_content) if lrc_content else "Letra não encontrada."
 
-    # Iniciar MPV com janela VISÍVEL e controles IPC
-    comando = [
-        MPV_PATH,
-        f"ytdl://ytsearch:{busca_audio}",
-        "--input-ipc-server=\\\\.\\pipe\\mpv-karaoke",
-        "--force-window=yes",
-        "--video=no",
-        "--geometry=500x300",
-        "--title=CONTROLE DO KARAOKE",
-        "--ontop=yes"
-    ]
+    # Comando MPV
+    comando = [MPV_PATH, f"ytdl://ytsearch:{busca_audio}", "--input-ipc-server=\\\\.\\pipe\\mpv-karaoke", 
+               "--force-window=yes", "--video=no", "--geometry=500x300", "--title=CONTROLE", "--ontop=yes"]
 
     try:
         player = subprocess.Popen(comando, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except Exception as e:
-        print(f"❌ Erro ao abrir MPV: {e}")
+    except:
+        print("❌ Erro ao abrir MPV. Verifique o caminho no .env")
         return
 
     threading.Thread(target=monitorar_via_ipc, daemon=True).start()
 
-    indice_exibido = -1
-    global player_ativo
-    
+    if modo_estatico:
+        exibir_cabecalho(musica, artista, True)
+        print("\n" + texto_estatico + "\n")
+        print("\033[1;33m" + "═"*shutil.get_terminal_size().columns + "\033[0m")
+    else:
+        exibir_cabecalho(musica, artista, False)
+
     try:
         while player.poll() is None:
-            # Lógica de seleção de letra
-            indice_da_vez = -1
-            for i, item in enumerate(letras):
-                if tempo_atual >= item["tempo"]:
-                    indice_da_vez = i
-                else: break
-            
-            # Atualização do Display
-            letra_txt = letras[indice_da_vez]["texto"] if indice_da_vez != -1 else "..."
-            proxima_txt = letras[indice_da_vez+1]["texto"] if (indice_da_vez + 1) < len(letras) else "---"
-            
-            # Só atualizamos se o tempo mudar ou a letra mudar
-            exibir_layout(musica, artista, letra_txt, proxima_txt)
-            
-            time.sleep(0.15) # Refresh rate balanceado
+            # Teclas de ajuste: [ (atrasa) ] (adianta)
+            if msvcrt and msvcrt.kbhit():
+                tecla = msvcrt.getch()
+                if tecla == b'[': offset_ajuste -= 0.3
+                elif tecla == b']': offset_ajuste += 0.3
 
-    except KeyboardInterrupt:
-        pass
+            if modo_estatico:
+                exibir_barra_status(tempo_atual, duracao_total, 0, True)
+            else:
+                indice_da_vez = -1
+                for i, item in enumerate(letras):
+                    if tempo_atual >= (item["tempo"] + offset_ajuste):
+                        indice_da_vez = i
+                    else: break
+                
+                letra_txt = letras[indice_da_vez]["texto"] if indice_da_vez != -1 else "..."
+                proxima_txt = letras[indice_da_vez+1]["texto"] if (indice_da_vez + 1) < len(letras) else "---"
+                
+                exibir_cabecalho(musica, artista, False)
+                print("\n" * 2)
+                print("\033[1;32m" + letra_txt.center(shutil.get_terminal_size().columns) + "\033[0m")
+                print("\n\033[90m" + f"({proxima_txt})".center(shutil.get_terminal_size().columns) + "\033[0m")
+                print("\n" * 2)
+                exibir_barra_status(tempo_atual, duracao_total, offset_ajuste)
+            
+            time.sleep(0.2)
+
+    except KeyboardInterrupt: pass
     finally:
         player_ativo = False
         player.terminate()
-        print("\n\033[1;35m--- SESSÃO DE KARAOKÊ ENCERRADA ---\033[0m")
+        print("\n\n\033[1;35m--- SESSÃO ENCERRADA ---\033[0m")
 
 if __name__ == "__main__":
     tocar_karaoke()
