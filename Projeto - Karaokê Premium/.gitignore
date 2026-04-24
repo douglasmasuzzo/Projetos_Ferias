@@ -1,0 +1,8 @@
+# Configurações locais e sensíveis
+ .env
+ offsets.json
+
+# Python
+ __pycache__/
+ *.pytest_cache/
+ *.pyc
