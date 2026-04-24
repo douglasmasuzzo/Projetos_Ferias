@@ -1,62 +1,62 @@
-# 🎤 **Projeto - Karaokê Premium** 
+# 🎤 **Projeto - Karaokê Premium (V2.1)** 
 
-Um motor de karaokê via terminal que sincroniza áudio do YouTube com letras em tempo real (LRC), utilizando o player MPV para processamento de áudio e uma interface rica no console.
+Um motor de karaokê via terminal de alta performance que sincroniza áudio do YouTube com letras em tempo real (LRC). Esta versão apresenta uma arquitetura modular robusta, persistência de sincronia e interface interativa.
 
 ## ✨ Funcionalidades
 
-- **Busca Automática:** Localiza áudios oficiais no YouTube e letras sincronizadas na nuvem.
-- **Interface Terminal (TUI):** Layout estilizado com barra de progresso, cores e exibição da letra atual e próxima estrofe.
-- **Sincronização via IPC:** Comunicação direta com o motor do MPV através de *Named Pipes* para precisão de milissegundos.
-- **Controles Integrados:** Suporte a pausa, pulo de trechos e ajuste de volume diretamente pelo player MPV.
-- **Modo Minimalista:** Foco total na letra no terminal enquanto o áudio roda em segundo plano.
+- **Arquitetura Modular:** Separação clara entre motor de sincronia (`core`), serviços de letras (`services`) e orquestração (`main.py`).
+- **Busca Interativa:** Preview de letras antes da reprodução para garantir a versão correta (ex: Extended, Live, Studio).
+- **Persistência de Offset (Sincronia):** Sistema inteligente que memoriza seus ajustes manuais por música em um banco de dados local (`offsets.json`).
+- **Sincronização via IPC:** Comunicação via Named Pipes com o MPV para precisão de milissegundos.
+- **Suite de Testes:** Validação automatizada da lógica de processamento de letras e engine de sincronia via Pytest.
+
+## 📂 Estrutura do Projeto
+
+- `main.py`: Ponto de entrada e interface do usuário.
+- `core/`: 
+  - `sync_engine.py`: Lógica matemática de sincronização.
+  - `models.py`: Definições de dados (LyricLine, PlayerState, SyncState).
+- `services/`: 
+  - `lyrics_service.py`: Processamento e parsing de arquivos LRC.
+- `tests/`: Suite de testes para garantir integridade após refatoração.
 
 ## 🚀 Pré-requisitos
 
-Para rodar o projeto, você precisará de:
-
 1.  **Python 3.8+**
 2.  **MPV Player:** Recomendado o [mpv.net](https://github.com/mpvnet-player/mpv.net) para Windows.
-3.  **yt-dlp:** Necessário para o MPV conseguir extrair áudio do YouTube.
+3.  **yt-dlp:** Essencial para o streaming de áudio.
 
 ## 🛠️ Instalação
 
-1.  Clone este repositório.
-2.  Instale as dependências do Python:
+1.  Instale as dependências:
     ```bash
-    pip install syncedlyrics python-dotenv
+    pip install syncedlyrics python-dotenv pytest
     ```
-3.  Certifique-se de que o `yt-dlp` está instalado no seu sistema (ou acessível pelo MPV).
+2.  Certifique-se de que o `yt-dlp` está no PATH do seu sistema.
 
 ## ⚙️ Configuração
 
-Crie ou edite o arquivo `.env` na raiz do projeto para apontar para o seu executável do MPV:
-
+Configure o arquivo `.env` na raiz:
 ```env
 MPV_PATH="C:\Caminho\Para\Seu\mpvnet.exe"
 ```
 
 ## 📖 Como Usar
 
-1. Execute o script principal:
+1. Execute a aplicação:
    ```bash
-   python script.py
+   python main.py
    ```
-2. Digite o **Nome do Artista**.
-3. Digite o **Nome da Música**.
-4. O sistema buscará a melhor versão do áudio e a letra correspondente.
-5. **Divirta-se!** 🎵
+2. **Busca:** Digite Artista e Música (especifique se for 'Extended' ou 'Live').
+3. **Validação:** Verifique o preview da letra no console e confirme com `S` ou `N`.
+4. **Sincronia:** Se a letra estiver atrasada ou adiantada, use as teclas `[` e `]` para ajustar. O sistema salvará este ajuste automaticamente para a próxima vez.
 
-### Controles (Na janela do MPV):
-- `Espaço`: Pausar/Retomar.
-- `Setas`: Avançar ou retroceder na música.
-- `9` e `0`: Ajustar volume.
+## 🧪 Testes
 
-## 🛠️ Tecnologias Utilizadas
-
-- **Python:** Lógica principal e Interface de Terminal.
-- **MPV:** Motor de áudio e comunicação IPC.
-- **SyncedLyrics:** Biblioteca para busca de letras LRC.
-- **JSON IPC:** Protocolo de comunicação entre o script e o player.
+Para validar a integridade do sistema:
+```bash
+python -m pytest
+```
 
 ---
-*Desenvolvido para amantes de música que preferem a simplicidade e o poder do terminal.*
+*Desenvolvido para entusiastas que buscam a precisão de um player profissional com a simplicidade do terminal.*
