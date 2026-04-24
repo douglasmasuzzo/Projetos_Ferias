@@ -1,205 +1,152 @@
 import os
 import time
-import subprocess
-import threading
 import json
-import shutil
-import syncedlyrics
-from dotenv import load_dotenv
+import logging
+from typing import Optional
 
-# Imports das novas camadas
-from core.models import LyricLine, PlayerState, SyncState
-from core.sync_engine import calcular_indice_atual
+from config.settings import (
+    SYNC_OFFSET_STEP,
+    DISPLAY_REFRESH,
+    LRC_SEARCH_TERMS_TEMPLATE,
+)
+from core.models import KaraokeSession, SyncState, LyricLine
+from core.sync_engine import calcular_indice_atual, aplicar_offset
 from services.lyrics_service import LyricsService
+from services.player_service import PlayerService
+from ui.renderer import Renderer
+from ui.input_handler import InputHandler, KeyAction
 
-try:
-    import msvcrt
-except ImportError:
-    msvcrt = None
+# Configuração de Logs
+logging.basicConfig(level=logging.WARNING, format='%(levelname)s: %(message)s')
 
-load_dotenv()
-
-# Configurações
-MPV_PATH = os.getenv("MPV_PATH", "mpv").strip('"').strip("'")
-PIPE_PATH = r'\\.\pipe\mpv-karaoke'
 OFFSET_FILE = "offsets.json"
 
-# Estado Global
-estado_player = PlayerState(position=0.0)
-estado_sync = SyncState(offset=0.0)
-duracao_total = 0.0
-player_ativo = True
 
-def carregar_offsets():
+def carregar_offsets() -> dict:
     if os.path.exists(OFFSET_FILE):
         try:
             with open(OFFSET_FILE, "r") as f:
                 return json.load(f)
-        except: return {}
+        except Exception:
+            return {}
     return {}
 
-def salvar_offset(musica_id, offset):
+
+def salvar_offset(musica_id: str, offset: float):
     offsets = carregar_offsets()
     offsets[musica_id] = round(offset, 2)
     try:
         with open(OFFSET_FILE, "w") as f:
             json.dump(offsets, f)
-    except: pass
+    except Exception:
+        pass
 
-def formatar_segundos(segundos):
-    minutos = int(segundos // 60)
-    segs = int(segundos % 60)
-    return f"{minutos:02d}:{segs:02d}"
 
-def limpar_console():
-    os.system('cls' if os.name == 'nt' else 'clear')
+def buscar_letra_interativa(artist: str, title: str, service: LyricsService, renderer: Renderer) -> Optional[str]:
+    for template in LRC_SEARCH_TERMS_TEMPLATE:
+        term = template.format(artist=artist, title=title)
+        renderer.draw_search_status(term)
 
-def limpar_lrc(conteudo):
-    if not conteudo: return ""
-    import re
-    texto = re.sub(r'\[.*?\]', '', conteudo)
-    linhas = [linha.strip() for linha in texto.split('\n') if linha.strip()]
-    return "\n".join(linhas)
-
-def monitorar_via_ipc():
-    global duracao_total, player_ativo
-    for _ in range(30): 
-        if os.path.exists(PIPE_PATH): break
-        time.sleep(0.5)
-    
-    while player_ativo:
         try:
-            with open(PIPE_PATH, 'w+b') as pipe:
-                for prop in ["time-pos", "duration"]:
-                    msg = f'{{"command": ["get_property", "{prop}"]}}\n'
-                    pipe.write(msg.encode('utf-8'))
-                    pipe.flush()
-                    res = pipe.readline().decode('utf-8')
-                    if res:
-                        dados = json.loads(res)
-                        if dados.get('data') is not None:
-                            if prop == "time-pos": 
-                                estado_player.position = float(dados['data'])
-                            else: 
-                                duracao_total = float(dados['data'])
-        except: pass
-        time.sleep(0.1)
-
-def exibir_interface(musica, artista, letras, modo_estatico=False):
-    colunas = shutil.get_terminal_size().columns
-    cor = "\033[1;33m" if modo_estatico else "\033[1;36m"
-    status_msg = " (MODO ESTÁTICO)" if modo_estatico else ""
-    limpar_console()
-    print(f"{cor}╔" + "═"*(colunas-2) + "╗\033[0m")
-    print(f"{cor}║" + f" 🎤 KARAOKÊ PREMIUM: {musica.upper()} - {artista.upper()}{status_msg} ".center(colunas-2) + "║\033[0m")
-    print(f"{cor}╠" + "═"*(colunas-2) + "╣\033[0m")
-
-    if modo_estatico:
-        print("\n" + letras + "\n")
-    else:
-        idx = calcular_indice_atual(letras, estado_player, estado_sync)
-        letra_atual = letras[idx].text if idx != -1 else "..."
-        proxima_letra = letras[idx+1].text if (idx + 1) < len(letras) else "---"
-        print("\n" * 2)
-        print("\033[1;32m" + letra_atual.center(colunas) + "\033[0m")
-        print("\n\033[90m" + f"({proxima_letra})".center(colunas) + "\033[0m")
-        print("\n" * 2)
-
-    if duracao_total > 0:
-        percent = min(estado_player.position / duracao_total, 1.0)
-        barra = "█" * int((colunas-45) * percent) + "░" * ((colunas-45) - int((colunas-45) * percent))
-        tempo_str = f"{formatar_segundos(estado_player.position)} / {formatar_segundos(duracao_total)}"
-        ajuste_str = f" [Sinc: {estado_sync.offset:+.1f}s]" if not modo_estatico else ""
-        print(f"\r\033[K   {tempo_str}  \033[1;34m{barra}\033[0m{ajuste_str}", end="", flush=True)
-
-def buscar_letra_interativa(artista, musica):
-    svc = LyricsService()
-    # Ordem de busca: Termo exato -> Oficial -> Artista+Musica
-    variacoes = [
-        f"{artista} {musica}",
-        f"{artista} {musica} ",
-        f"{artista} {musica} full lyrics"
-    ]
-    
-    for termo in variacoes:
-        print(f"\033[90m🔎 Tentando busca: '{termo}'...\033[0m")
-        try:
-            lrc = syncedlyrics.search(termo)
-            if lrc and "[" in lrc:
+            lrc = service.search(artist, title) # Simplificado para usar a lógica interna do service
+            if lrc:
                 # Preview para o usuário
-                preview = limpar_lrc(lrc).split('\n')[:4]
-                print(f"\n\033[1;32m✅ Letra encontrada!\033[0m")
-                print(f"\033[90m--- PREVIEW ---\033[0m")
-                for p in preview: print(f"  > {p}")
-                print(f"\033[90m---------------\033[0m")
+                preview = service.get_preview(lrc, max_lines=4)
+                renderer.draw_lyrics_preview(preview)
                 
-                escolha = input("❓ Esta letra está completa e correta? (S/N/PULAR): ").lower()
-                if escolha == 's' or escolha == '':
-                    return lrc, svc
+                escolha = input("\n❓ Esta letra está completa e correta? (S/N/PULAR): ").lower()
+                if escolha in ('s', ''):
+                    return lrc
                 elif escolha == 'pular':
                     break
-        except: continue
-    return None, svc
+        except Exception:
+            continue
+    return None
+
 
 def main():
-    global player_ativo
-    limpar_console()
-    print("\033[1;35m" + " KARAOKÊ PREMIUM V2.1 ".center(50, "=") + "\033[0m")
+    renderer = Renderer()
+    renderer.draw_startup()
+
+    artist = input("👤 Artista: ").strip()
+    title = input("🎵 Música: ").strip()
     
-    artista = input("\n👤 Artista: ").strip()
-    musica = input("🎵 Música: ").strip()
-    musica_id = f"{artista}-{musica}".lower().replace(" ", "_")
+    if not artist or not title:
+        renderer.draw_error("Artista e Música são obrigatórios.")
+        return
+
+    musica_id = f"{artist}-{title}".lower().replace(" ", "_")
     
-    # Persistência de Offset
+    # Carregar offsets persistidos
     offsets_salvos = carregar_offsets()
-    estado_sync.offset = offsets_salvos.get(musica_id, 0.0)
+    offset_inicial = offsets_salvos.get(musica_id, 0.0)
     
-    lrc_content, service = buscar_letra_interativa(artista, musica)
-    letras_objetos = []
+    # Serviços
+    lyrics_svc = LyricsService()
+    player_svc = PlayerService()
+    
+    # Busca de Letra
+    lrc_content = buscar_letra_interativa(artist, title, lyrics_svc, renderer)
+    
+    # Prepara a sessão
+    session = KaraokeSession(
+        artist=artist,
+        title=title,
+        sync_state=SyncState(offset=offset_inicial)
+    )
 
     if lrc_content:
-        for linha in lrc_content.split('\n'):
-            tempo = service._parse_timestamp(linha)
-            texto = linha.split("]")[-1].strip()
-            if tempo is not None and texto:
-                letras_objetos.append(LyricLine(timestamp=tempo, text=texto))
-
-    modo_estatico = len(letras_objetos) == 0
-    conteudo_exibicao = limpar_lrc(lrc_content) if modo_estatico else letras_objetos
-
-    # Busca de áudio focada no termo exato do usuário
-    busca_audio = f"{artista} {musica}"
-    if "extended" not in busca_audio.lower() and "extended" in musica.lower():
-        busca_audio += " extended"
-
-    comando = [MPV_PATH, f"ytdl://ytsearch:{busca_audio} official audio", 
-               f"--input-ipc-server={PIPE_PATH}", "--video=no", "--ontop=yes", "--title=KARAOKE_CONTROLE"]
+        session.lyrics = lyrics_svc.parse_lrc(lrc_content)
+        session.static_text = lyrics_svc.extract_plain_text(lrc_content)
     
+    # Inicia o Player
+    if not player_svc.start(session.search_query_audio):
+        renderer.draw_error("Não foi possível iniciar o player (MPV).")
+        return
+
+    renderer.draw_header(session)
+    print(f"\n▶ Player iniciado. Sincronia: {session.sync_state.offset:+.1f}s")
+
     try:
-        player = subprocess.Popen(comando, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        threading.Thread(target=monitorar_via_ipc, daemon=True).start()
+        with InputHandler() as input_handler:
+            while player_svc.is_running():
+                # Atualiza estado do player
+                session.player_state = player_svc.state
+                
+                # Processa Input
+                action = input_handler.poll()
+                if action == KeyAction.OFFSET_DECREASE:
+                    session.sync_state = aplicar_offset(session.sync_state, -SYNC_OFFSET_STEP)
+                    salvar_offset(musica_id, session.sync_state.offset)
+                elif action == KeyAction.OFFSET_INCREASE:
+                    session.sync_state = aplicar_offset(session.sync_state, SYNC_OFFSET_STEP)
+                    salvar_offset(musica_id, session.sync_state.offset)
+                elif action == KeyAction.QUIT:
+                    break
 
-        print(f"\n\033[1;32m▶ Player iniciado. Sincronia salva: {estado_sync.offset:+.1f}s\033[0m")
-        print("\033[90m(Dica: Use '[' e ']' para ajustar em tempo real)\033[0m\n")
+                # Renderiza
+                renderer.clear()
+                renderer.draw_header(session)
+                
+                if session.is_static_mode:
+                    renderer.draw_static_lyrics(session.static_text)
+                else:
+                    idx = calcular_indice_atual(session.lyrics, session.player_state, session.sync_state)
+                    session.sync_state.current_index = idx
+                    
+                    cur_text = session.lyrics[idx].text if idx != -1 else "..."
+                    nxt_text = session.lyrics[idx + 1].text if (idx + 1) < len(session.lyrics) else "---"
+                    renderer.draw_lyrics(cur_text, nxt_text)
 
-        while player.poll() is None:
-            if msvcrt and msvcrt.kbhit():
-                tecla = msvcrt.getch()
-                if tecla == b'[': 
-                    estado_sync.offset -= 0.5
-                    salvar_offset(musica_id, estado_sync.offset)
-                elif tecla == b']': 
-                    estado_sync.offset += 0.5
-                    salvar_offset(musica_id, estado_sync.offset)
+                renderer.draw_status_bar(session.player_state, session.sync_state)
+                time.sleep(DISPLAY_REFRESH)
 
-            exibir_interface(musica, artista, conteudo_exibicao, modo_estatico)
-            time.sleep(0.1)
-
-    except KeyboardInterrupt: pass
+    except KeyboardInterrupt:
+        pass
     finally:
-        player_ativo = False
-        if 'player' in locals(): player.terminate()
-        print(f"\n\n\033[1;35m--- SESSÃO ENCERRADA (Offset final: {estado_sync.offset:+.1f}s) ---\033[0m")
+        player_svc.stop()
+        renderer.draw_session_end()
+
 
 if __name__ == "__main__":
     main()
