@@ -1,0 +1,23 @@
+:root {
+  --bg: #faf9f7;
+  --card: #ffffff;
+  --ink: #1f2320;
+  --muted: #6b7268;
+  --line: #e6e3dd;
+  --work: #c8674f;
+  --study: #4a7c6c;
+  --project: #7a6ba6;
+  --free: #b8ad8f;
+  --accent: #d8623f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+}
