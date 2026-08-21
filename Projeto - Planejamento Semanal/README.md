@@ -1,4 +1,4 @@
-# Planejador Semanal
+# Planejador Semanal de Tempo
 
 Aplicação web pequena em React (Vite) para organizar a semana entre trabalho/estágio, estudos e projetos pessoais.
 
