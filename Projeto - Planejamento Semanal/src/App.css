@@ -212,3 +212,95 @@
   text-align: center;
   margin-top: 20px;
 }
+
+/* ---------- Gerenciador de tipos de atividade ---------- */
+
+.activity-manager {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.activity-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.activity-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.chip-remove {
+  border: none;
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  font-size: 0.65rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.color-input {
+  width: 40px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* ---------- Badge e destaque de prioridade ---------- */
+
+.priority-badge {
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.priority-select {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 0.8rem;
+  background: var(--card);
+  color: var(--ink);
+}
+
+/* Destaque visual reforçado nas tarefas de prioridade Alta */
+.priority-row:has(.priority-badge[title="Prioridade Alta"]) {
+  animation: priority-pulse 2.4s ease-in-out infinite;
+  border-left: 3px solid var(--work);
+  padding-left: 8px;
+  border-radius: 6px;
+}
+
+@keyframes priority-pulse {
+  0%, 100% { background-color: transparent; }
+  50% { background-color: rgba(200, 67, 63, 0.08); }
+}
+
+/* ---------- Status de sincronização ---------- */
+
+.status-error { color: var(--work); }
+.status-offline { color: var(--muted); }
+.status-synced { color: var(--study); }

@@ -3,6 +3,11 @@ dist
 dist-ssr
 *.local
 
+# Variáveis de ambiente (NUNCA commitar chaves/URLs do Supabase)
+.env
+.env.local
+.env.*.local
+
 # Editor
 .vscode/*
 !.vscode/extensions.json
