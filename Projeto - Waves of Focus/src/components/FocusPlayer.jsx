@@ -45,11 +45,11 @@ export default function FocusPlayer() {
   const environment = getEnvironment(environmentId)
   const stationIndex = Math.max(0, ENVIRONMENTS.findIndex((env) => env.id === environmentId))
 
-  const status = error ? 'error' : !isReady ? 'loading' : isPlaying ? 'playing' : 'paused'
-  const statusText = error ? 'Falha' : !isReady ? 'Sintonizando…' : isPlaying ? 'Tocando' : 'Pausado'
-
   const { isReady, isPlaying, isLoading, error, setVolume: setPlayerVolume, togglePlay, retry } =
     useYouTubePlayer(PLAYER_CONTAINER_ID, environment.videoId, volume)
+
+  const status = error ? 'error' : !isReady ? 'loading' : isPlaying ? 'playing' : 'paused'
+  const statusText = error ? 'Falha' : !isReady ? 'Sintonizando…' : isPlaying ? 'Tocando' : 'Pausado'
 
   useEffect(() => {
     setPlayerVolume(volume)
